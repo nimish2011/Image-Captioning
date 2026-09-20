@@ -7,3 +7,6 @@ tensorboard
 fastapi
 uvicorn
 python-multipart
+tqdm
+sentence-transformers
+requests

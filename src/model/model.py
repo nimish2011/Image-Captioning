@@ -7,7 +7,10 @@ class EncoderCNN(nn.Module):
     def __init__(self, embed_size, train_CNN=False):
         super(EncoderCNN, self).__init__()
         self.train_CNN = train_CNN
-        self.inception = models.inception_v3(pretrained=True, aux_logits=False)
+        weights = models.Inception_V3_Weights.IMAGENET1K_V1
+        self.inception = models.inception_v3(weights=weights, aux_logits=True)
+        self.inception.aux_logits = False
+        self.inception.AuxLogits = None
         self.inception.fc = nn.Linear(self.inception.fc.in_features, embed_size)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(0.5)

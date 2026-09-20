@@ -1,12 +1,16 @@
+import logging
 import os
+
 import pandas as pd
 import spacy
 import torch
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, Dataset
 
 spacy_eng = spacy.load("en_core_web_sm")
+logger = logging.getLogger(__name__)
+
 
 class Vocabulary:
     def __init__(self, freq_threshold):
@@ -41,6 +45,7 @@ class Vocabulary:
             for token in tokenized_text
         ]
 
+
 class FlickrDataset(Dataset):
     def __init__(self, root_folder, captions_file, transform=None, freq_threshold=5):
         self.root_folder = root_folder
@@ -59,7 +64,13 @@ class FlickrDataset(Dataset):
     def __getitem__(self, index):
         caption = self.captions[index]
         img_id = self.imgs[index]
-        img = Image.open(os.path.join(self.root_folder, img_id)).convert("RGB")
+        img_path = os.path.join(self.root_folder, img_id)
+
+        try:
+            img = Image.open(img_path).convert("RGB")
+        except (FileNotFoundError, UnidentifiedImageError) as e:
+            logger.error("Could not load image '%s' (row %d): %s", img_path, index, e)
+            raise
 
         if self.transform is not None:
             img = self.transform(img)
@@ -69,6 +80,7 @@ class FlickrDataset(Dataset):
         numericalized_caption.append(self.vocab.stoi["<EOS>"])
 
         return img, torch.tensor(numericalized_caption)
+
 
 class MyCollate:
     def __init__(self, pad_idx):

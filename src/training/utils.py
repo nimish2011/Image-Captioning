@@ -1,7 +1,11 @@
+import logging
 import os
+
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 def print_examples(model, device, dataset, test_folder="test_examples"):
@@ -16,7 +20,7 @@ def print_examples(model, device, dataset, test_folder="test_examples"):
     model.eval()
 
     if not os.path.isdir(test_folder):
-        print(f"[print_examples] '{test_folder}' not found — skipping.")
+        logger.info("'%s' not found — skipping example captions.", test_folder)
         model.train()
         return
 
@@ -24,22 +28,23 @@ def print_examples(model, device, dataset, test_folder="test_examples"):
         path = os.path.join(test_folder, fname)
         try:
             img = transform(Image.open(path).convert("RGB")).unsqueeze(0)
-        except Exception:
+        except Exception as e:
+            logger.warning("Skipping '%s': %s", fname, e)
             continue
 
         caption = model.caption_image(img.to(device), dataset.vocab)
-        print(f"{fname} -> " + " ".join(caption))
+        logger.info("%s -> %s", fname, " ".join(caption))
 
     model.train()
 
 
 def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
-    print("=> Saving checkpoint")
+    logger.info("Saving checkpoint to '%s'", filename)
     torch.save(state, filename)
 
 
 def load_checkpoint(checkpoint, model, optimizer):
-    print("=> Loading checkpoint")
+    logger.info("Loading checkpoint")
     model.load_state_dict(checkpoint["state_dict"])
     optimizer.load_state_dict(checkpoint["optimizer"])
     step = checkpoint["step"]

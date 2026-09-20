@@ -2,6 +2,7 @@ import torchvision.transforms as transforms
 import torch
 from PIL import Image
 
+
 def get_transform():
     return transforms.Compose(
         [

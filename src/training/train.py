@@ -1,12 +1,18 @@
+import logging
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 from src.data_loader.get_loader import get_loader
+from src.logging_config import setup_logging
 from src.model.model import CNNtoRNN
 from src.training.utils import load_checkpoint, print_examples, save_checkpoint
+
+logger = logging.getLogger(__name__)
 
 
 def train():
@@ -20,10 +26,10 @@ def train():
     )
 
     train_loader, dataset = get_loader(
-        root_folder="flickr8k/Images",
+        root_folder="flickr8k/images",
         annotation_file="flickr8k/captions.txt",
         transform=transform,
-        num_workers=2,
+        num_workers=0,
     )
 
     torch.backends.cudnn.benchmark = True
@@ -50,34 +56,58 @@ def train():
 
     model.train()
 
-    for epoch in range(num_epochs):
-        print_examples(model, device, dataset)
+    try:
+        for epoch in range(num_epochs):
+            print_examples(model, device, dataset)
 
+            if save_model:
+                checkpoint = {
+                    "state_dict": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "step": step,
+                    "vocab": dataset.vocab,
+                }
+                save_checkpoint(checkpoint)
+
+            loop = tqdm(train_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=True)
+            for idx, (imgs, captions) in enumerate(loop):
+                imgs = imgs.to(device)
+                captions = captions.to(device)
+
+                outputs = model(imgs, captions[:-1])
+                loss = criterion(
+                    outputs.reshape(-1, outputs.shape[2]), captions.reshape(-1)
+                )
+
+                writer.add_scalar("Training loss", loss.item(), global_step=step)
+                step += 1
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                loop.set_postfix(loss=loss.item())
+
+            logger.info("Epoch %d/%d complete.", epoch + 1, num_epochs)
+
+    except KeyboardInterrupt:
+        logger.warning("Training interrupted by user — saving current progress.")
+    except Exception:
+        logger.exception("Training stopped due to an unexpected error.")
+        raise
+    finally:
         if save_model:
-            checkpoint = {
-                "state_dict": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "step": step,
-                "vocab": dataset.vocab,
-            }
-            save_checkpoint(checkpoint)
-
-        for idx, (imgs, captions) in enumerate(train_loader):
-            imgs = imgs.to(device)
-            captions = captions.to(device)
-
-            outputs = model(imgs, captions[:-1])
-            loss = criterion(
-                outputs.reshape(-1, outputs.shape[2]), captions.reshape(-1)
+            save_checkpoint(
+                {
+                    "state_dict": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "step": step,
+                    "vocab": dataset.vocab,
+                }
             )
-
-            writer.add_scalar("Training loss", loss.item(), global_step=step)
-            step += 1
-
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            logger.info("Final checkpoint saved.")
 
 
 if __name__ == "__main__":
+    setup_logging()
     train()
