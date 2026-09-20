@@ -3,25 +3,27 @@ import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
-from utils import save_checkpoint, load_checkpoint, print_examples
-from get_loader import get_loader
+
+from src.data_loader.get_loader import get_loader
 from src.model.model import CNNtoRNN
+from src.training.utils import load_checkpoint, print_examples, save_checkpoint
+
 
 def train():
     transform = transforms.Compose(
         [
-            transforms.Resize((356,356)),
-            transforms.RandomCrop((299,299)),
+            transforms.Resize((356, 356)),
+            transforms.RandomCrop((299, 299)),
             transforms.ToTensor(),
-            transforms.Normalize((0.5,0.5,0.5),(0.5,0.5,0.5))
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]
     )
 
     train_loader, dataset = get_loader(
-        root_folder = "flickr8k/images",
-        annotation_file = "flickr8k/captions.txt",
-        transform = transform,
-        num_workers = 2
+        root_folder="flickr8k/Images",
+        annotation_file="flickr8k/captions.txt",
+        transform=transform,
+        num_workers=2,
     )
 
     torch.backends.cudnn.benchmark = True
@@ -41,34 +43,41 @@ def train():
 
     model = CNNtoRNN(embed_size, hidden_size, vocab_size, num_layers).to(device)
     criterion = nn.CrossEntropyLoss(ignore_index=dataset.vocab.stoi["<PAD>"])
-    optimizer = optim.Adam(model.parameters(), lr = learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     if load_model:
         step = load_checkpoint(torch.load("my_checkpoint.pth.tar"), model, optimizer)
 
     model.train()
+
     for epoch in range(num_epochs):
-        print_examples(model,device,dataset)
-        
+        print_examples(model, device, dataset)
+
         if save_model:
             checkpoint = {
-                "state_dict" : model.state_dict(),
-                "optimizer" : optimizer.state_dict(),
-                "step" : step
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "step": step,
+                "vocab": dataset.vocab,
             }
             save_checkpoint(checkpoint)
 
-        for idx, (imgs,captions) in enumerate(train_loader):
+        for idx, (imgs, captions) in enumerate(train_loader):
             imgs = imgs.to(device)
             captions = captions.to(device)
 
-            outputs = model(imgs,captions[:-1])
-            loss = criterion(outputs.reshape(-1,outputs.shape[2]), caption.reshape(-1))
+            outputs = model(imgs, captions[:-1])
+            loss = criterion(
+                outputs.reshape(-1, outputs.shape[2]), captions.reshape(-1)
+            )
+
             writer.add_scalar("Training loss", loss.item(), global_step=step)
             step += 1
+
             optimizer.zero_grad()
-            loss.backward(loss)
+            loss.backward()
             optimizer.step()
+
 
 if __name__ == "__main__":
     train()

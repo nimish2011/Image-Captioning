@@ -1,0 +1,46 @@
+import os
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+
+
+def print_examples(model, device, dataset, test_folder="test_examples"):
+    transform = transforms.Compose(
+        [
+            transforms.Resize((299, 299)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ]
+    )
+
+    model.eval()
+
+    if not os.path.isdir(test_folder):
+        print(f"[print_examples] '{test_folder}' not found — skipping.")
+        model.train()
+        return
+
+    for fname in sorted(os.listdir(test_folder)):
+        path = os.path.join(test_folder, fname)
+        try:
+            img = transform(Image.open(path).convert("RGB")).unsqueeze(0)
+        except Exception:
+            continue
+
+        caption = model.caption_image(img.to(device), dataset.vocab)
+        print(f"{fname} -> " + " ".join(caption))
+
+    model.train()
+
+
+def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
+    print("=> Saving checkpoint")
+    torch.save(state, filename)
+
+
+def load_checkpoint(checkpoint, model, optimizer):
+    print("=> Loading checkpoint")
+    model.load_state_dict(checkpoint["state_dict"])
+    optimizer.load_state_dict(checkpoint["optimizer"])
+    step = checkpoint["step"]
+    return step
