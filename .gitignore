@@ -21,6 +21,7 @@ runs/
 my_checkpoint.*
 *.faiss
 *.index
+*.npz
 *.pkl
 *.zip
 *.log

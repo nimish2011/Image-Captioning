@@ -21,7 +21,7 @@ EMBEDDING_MODEL_NAME = "all-MiniLM-L6-v2"
 
 
 def load_caption_model(checkpoint_path, device):
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE, weights_only=False)
     vocab = checkpoint["vocab"]
 
     model = CNNtoRNN(EMBED_SIZE, HIDDEN_SIZE, len(vocab), NUM_LAYERS).to(device)

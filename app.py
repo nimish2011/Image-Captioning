@@ -44,7 +44,7 @@ def _load_model():
             f"environment variable to point at an existing checkpoint."
         )
 
-    checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE)
+    checkpoint = torch.load(CHECKPOINT_PATH, map_location=DEVICE, weights_only=False)
     vocab = checkpoint["vocab"]
 
     model = CNNtoRNN(EMBED_SIZE, HIDDEN_SIZE, len(vocab), NUM_LAYERS).to(DEVICE)
